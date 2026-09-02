@@ -36,7 +36,7 @@ export function Rewards({
                 <Gift className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-medium">{reward.name}</p>
+                <p className="text-[13.5px] font-medium leading-snug">{reward.name}</p>
                 <p className="text-[11.5px] text-muted-foreground">
                   {reward.tag} · {reward.cost} pts
                 </p>
