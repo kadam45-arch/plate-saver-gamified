@@ -132,8 +132,8 @@ function Index() {
               Y
             </span>
             <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">Yash Kadam • CSE 3rd Year</h1>
-              <p className="text-[12.5px] text-muted-foreground">Hostel B • Roll No. 42 • Veg</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Yash Kadam • ECS 2nd Year</h1>
+              <p className="text-[12.5px] text-muted-foreground">Day Scholar • Roll No. 33 • Veg</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
