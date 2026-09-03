@@ -105,6 +105,25 @@ function Index() {
   const [points, setPoints] = useState(1250);
   const [modal, setModal] = useState<null | "book" | "plate">(null);
   const [verified, setVerified] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const { session, loading } = useSession();
+  const navigate = useNavigate();
+  const isAuthed = !!session;
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthed && sessionStorage.getItem("ecomess_just_logged_in") === "1") {
+      sessionStorage.removeItem("ecomess_just_logged_in");
+      setShowSync(true);
+    }
+  }, [isAuthed]);
 
   const notify = (msg: string) => toast(msg, { duration: 3000 });
 
@@ -119,6 +138,11 @@ function Index() {
     notify(`Redeemed • ${r.name}`);
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  };
+
   const leaders = [
     { name: "Yash Kadam", sub: "You • Hostel B", pts: points, you: true, medal: "🥇" },
     { name: "Aarav Sharma", sub: "Hostel B", pts: 1180, you: false, medal: "🥈" },
@@ -127,33 +151,70 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:py-10">
-        {/* HEADER */}
-        <header className="flex flex-wrap items-center justify-between gap-4">
+      {/* HEADER */}
+      <header
+        className={`sticky top-0 z-40 transition-all duration-300 ${
+          scrolled
+            ? "border-b border-zinc-200 bg-white/70 backdrop-blur-xl shadow-sm"
+            : "border-b border-transparent bg-transparent"
+        }`}
+      >
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <span className="flex size-12 items-center justify-center rounded-full bg-[#111111] text-[17px] font-semibold text-white">
+            <span className="flex size-10 items-center justify-center rounded-full bg-[#111111] text-[15px] font-semibold text-white">
               Y
             </span>
             <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">Yash Kadam • ECS 2nd Year</h1>
-              <p className="text-[12.5px] text-muted-foreground">Day Scholar • Roll No. 33 • Veg</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Eco-Mess</h1>
+              <p className="text-[12px] text-muted-foreground">Food waste, gamified</p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm">
-              🔥 12 Day Streak
-            </span>
-            <motion.span
-              key={points}
-              initial={{ scale: 0.92 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 340, damping: 18 }}
-              className="rounded-full bg-[#111111] px-4 py-2 text-[13px] font-semibold text-white"
-            >
-              {points.toLocaleString()} pts
-            </motion.span>
+            {loading ? null : isAuthed ? (
+              <>
+                <span className="hidden rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm sm:inline">
+                  🔥 12 Day Streak
+                </span>
+                <span className="hidden text-right leading-tight sm:block">
+                  <span className="block text-[13.5px] font-semibold tracking-tight">
+                    Yash Kadam • ECS 2nd Year
+                  </span>
+                  <span className="block text-[11.5px] text-muted-foreground">
+                    Day Scholar • Roll No. 33 • Veg
+                  </span>
+                </span>
+                <motion.span
+                  key={points}
+                  initial={{ scale: 0.92 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 340, damping: 18 }}
+                  className="rounded-full bg-[#111111] px-4 py-2 text-[13px] font-semibold text-white"
+                >
+                  {points.toLocaleString()} pts
+                </motion.span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm hover:shadow-md"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/auth"
+                className="rounded-full bg-[#111111] px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Login / Signup
+              </Link>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:py-10">
+
 
         {/* HERO */}
         <section className="grid gap-4 lg:grid-cols-12">
