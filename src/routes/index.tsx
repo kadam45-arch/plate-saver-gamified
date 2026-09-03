@@ -125,6 +125,27 @@ function Index() {
     }
   }, [isAuthed]);
 
+  const [rows, setRows] = useState<
+    { id: string; full_name: string; branch: string | null; eco_points: number }[]
+  >([]);
+
+  useEffect(() => {
+    if (!isAuthed) {
+      setRows([]);
+      return;
+    }
+    let active = true;
+    supabase
+      .rpc("get_leaderboard")
+      .then(({ data }) => {
+        if (active && data) setRows(data as typeof rows);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAuthed]);
+
+
   const notify = (msg: string) => toast(msg, { duration: 3000 });
 
   const add = (n: number, msg: string) => {

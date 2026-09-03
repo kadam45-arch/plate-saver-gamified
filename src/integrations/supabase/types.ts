@@ -73,7 +73,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_leaderboard: {
+        Args: never
+        Returns: {
+          branch: string
+          eco_points: number
+          full_name: string
+          id: string
+        }[]
+      }
     }
     Enums: {
       meal_status: "pre_booked" | "zero_waste"
