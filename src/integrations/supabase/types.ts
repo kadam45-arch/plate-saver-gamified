@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      meal_logs: {
+        Row: {
+          created_at: string
+          id: string
+          meal_type: string
+          points_earned: number
+          status: Database["public"]["Enums"]["meal_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meal_type: string
+          points_earned?: number
+          status: Database["public"]["Enums"]["meal_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meal_type?: string
+          points_earned?: number
+          status?: Database["public"]["Enums"]["meal_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          branch: string | null
+          created_at: string
+          eco_points: number
+          full_name: string
+          id: string
+          roll_no: string | null
+        }
+        Insert: {
+          branch?: string | null
+          created_at?: string
+          eco_points?: number
+          full_name?: string
+          id: string
+          roll_no?: string | null
+        }
+        Update: {
+          branch?: string | null
+          created_at?: string
+          eco_points?: number
+          full_name?: string
+          id?: string
+          roll_no?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +76,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      meal_status: "pre_booked" | "zero_waste"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +203,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      meal_status: ["pre_booked", "zero_waste"],
+    },
   },
 } as const
