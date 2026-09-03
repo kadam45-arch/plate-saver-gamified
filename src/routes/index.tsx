@@ -1,8 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/hooks/useSession";
+import { ConnectSyncOverlay } from "@/components/ConnectSyncOverlay";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,14 +60,13 @@ const ACTIONS = [
 ];
 
 const WEEK = [
-  { day: "Mon", v: 45 },
-  { day: "Tue", v: 62 },
   { day: "Wed", v: 38 },
   { day: "Thu", v: 74 },
   { day: "Fri", v: 55 },
   { day: "Sat", v: 68 },
   { day: "Sun", v: 92 },
 ];
+
 
 const REWARDS = [
   { id: "dessert", emoji: "🍦", name: "Free Dessert", cost: 100 },
@@ -102,6 +105,25 @@ function Index() {
   const [points, setPoints] = useState(1250);
   const [modal, setModal] = useState<null | "book" | "plate">(null);
   const [verified, setVerified] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const { session, loading } = useSession();
+  const navigate = useNavigate();
+  const isAuthed = !!session;
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthed && sessionStorage.getItem("ecomess_just_logged_in") === "1") {
+      sessionStorage.removeItem("ecomess_just_logged_in");
+      setShowSync(true);
+    }
+  }, [isAuthed]);
 
   const notify = (msg: string) => toast(msg, { duration: 3000 });
 
@@ -116,6 +138,11 @@ function Index() {
     notify(`Redeemed • ${r.name}`);
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  };
+
   const leaders = [
     { name: "Yash Kadam", sub: "You • Hostel B", pts: points, you: true, medal: "🥇" },
     { name: "Aarav Sharma", sub: "Hostel B", pts: 1180, you: false, medal: "🥈" },
@@ -124,33 +151,70 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:py-10">
-        {/* HEADER */}
-        <header className="flex flex-wrap items-center justify-between gap-4">
+      {/* HEADER */}
+      <header
+        className={`sticky top-0 z-40 transition-all duration-300 ${
+          scrolled
+            ? "border-b border-zinc-200 bg-white/70 backdrop-blur-xl shadow-sm"
+            : "border-b border-transparent bg-transparent"
+        }`}
+      >
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <span className="flex size-12 items-center justify-center rounded-full bg-[#111111] text-[17px] font-semibold text-white">
+            <span className="flex size-10 items-center justify-center rounded-full bg-[#111111] text-[15px] font-semibold text-white">
               Y
             </span>
             <div className="leading-tight">
-              <h1 className="text-[15px] font-semibold tracking-tight">Yash Kadam • ECS 2nd Year</h1>
-              <p className="text-[12.5px] text-muted-foreground">Day Scholar • Roll No. 33 • Veg</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Eco-Mess</h1>
+              <p className="text-[12px] text-muted-foreground">Food waste, gamified</p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm">
-              🔥 12 Day Streak
-            </span>
-            <motion.span
-              key={points}
-              initial={{ scale: 0.92 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 340, damping: 18 }}
-              className="rounded-full bg-[#111111] px-4 py-2 text-[13px] font-semibold text-white"
-            >
-              {points.toLocaleString()} pts
-            </motion.span>
+            {loading ? null : isAuthed ? (
+              <>
+                <span className="hidden rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm sm:inline">
+                  🔥 12 Day Streak
+                </span>
+                <span className="hidden text-right leading-tight sm:block">
+                  <span className="block text-[13.5px] font-semibold tracking-tight">
+                    Yash Kadam • ECS 2nd Year
+                  </span>
+                  <span className="block text-[11.5px] text-muted-foreground">
+                    Day Scholar • Roll No. 33 • Veg
+                  </span>
+                </span>
+                <motion.span
+                  key={points}
+                  initial={{ scale: 0.92 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 340, damping: 18 }}
+                  className="rounded-full bg-[#111111] px-4 py-2 text-[13px] font-semibold text-white"
+                >
+                  {points.toLocaleString()} pts
+                </motion.span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm hover:shadow-md"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/auth"
+                className="rounded-full bg-[#111111] px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Login / Signup
+              </Link>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:py-10">
+
 
         {/* HERO */}
         <section className="grid gap-4 lg:grid-cols-12">
@@ -216,21 +280,23 @@ function Index() {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
-              className="soft-card p-6"
+              className="soft-card p-4"
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Weekly Activity
               </p>
-              <div className="mt-5 flex h-24 items-end justify-between gap-2">
+              <div className="mt-3 flex h-12 items-end justify-between gap-1.5">
+
                 {WEEK.map((d, i) => (
-                  <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                  <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
                     <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: `${d.v}%` }}
                       transition={{ duration: 0.6, delay: 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                       className={`w-full rounded-full ${i === WEEK.length - 1 ? "bg-[#111111]" : "bg-zinc-200"}`}
                     />
-                    <span className="text-[10.5px] text-muted-foreground">{d.day}</span>
+                    <span className="text-[9.5px] text-muted-foreground">{d.day}</span>
+
                   </div>
                 ))}
               </div>
@@ -287,7 +353,7 @@ function Index() {
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="soft-card p-6 lg:col-span-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold tracking-tight">Hostel B Leaderboard 🏆</h2>
+              <h2 className="text-[16px] font-semibold tracking-tight">Leaderboard 🏆</h2>
               <span className="text-[12px] text-muted-foreground">This Week</span>
             </div>
             <ul className="mt-5 space-y-2.5">
@@ -407,7 +473,10 @@ function Index() {
         )}
       </Modal>
 
+      <ConnectSyncOverlay open={showSync} points={points} onClose={() => setShowSync(false)} />
+
       <Toaster
+
         position="bottom-center"
         toastOptions={{
           className:
