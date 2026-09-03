@@ -280,21 +280,23 @@ function Index() {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
-              className="soft-card p-6"
+              className="soft-card p-4"
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Weekly Activity
               </p>
-              <div className="mt-5 flex h-24 items-end justify-between gap-2">
+              <div className="mt-3 flex h-12 items-end justify-between gap-1.5">
+
                 {WEEK.map((d, i) => (
-                  <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
+                  <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
                     <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: `${d.v}%` }}
                       transition={{ duration: 0.6, delay: 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                       className={`w-full rounded-full ${i === WEEK.length - 1 ? "bg-[#111111]" : "bg-zinc-200"}`}
                     />
-                    <span className="text-[10.5px] text-muted-foreground">{d.day}</span>
+                    <span className="text-[9.5px] text-muted-foreground">{d.day}</span>
+
                   </div>
                 ))}
               </div>
@@ -351,7 +353,7 @@ function Index() {
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="soft-card p-6 lg:col-span-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold tracking-tight">Hostel B Leaderboard 🏆</h2>
+              <h2 className="text-[16px] font-semibold tracking-tight">Leaderboard 🏆</h2>
               <span className="text-[12px] text-muted-foreground">This Week</span>
             </div>
             <ul className="mt-5 space-y-2.5">
@@ -471,7 +473,10 @@ function Index() {
         )}
       </Modal>
 
+      <ConnectSyncOverlay open={showSync} points={points} onClose={() => setShowSync(false)} />
+
       <Toaster
+
         position="bottom-center"
         toastOptions={{
           className:
