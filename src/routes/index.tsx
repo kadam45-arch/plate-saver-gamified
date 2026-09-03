@@ -1,8 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/hooks/useSession";
+import { ConnectSyncOverlay } from "@/components/ConnectSyncOverlay";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,14 +60,13 @@ const ACTIONS = [
 ];
 
 const WEEK = [
-  { day: "Mon", v: 45 },
-  { day: "Tue", v: 62 },
   { day: "Wed", v: 38 },
   { day: "Thu", v: 74 },
   { day: "Fri", v: 55 },
   { day: "Sat", v: 68 },
   { day: "Sun", v: 92 },
 ];
+
 
 const REWARDS = [
   { id: "dessert", emoji: "🍦", name: "Free Dessert", cost: 100 },
