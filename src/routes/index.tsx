@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { ConnectSyncOverlay } from "@/components/ConnectSyncOverlay";
-
+import { FoodMatchLoader } from "@/components/FoodMatchLoader";
+import { LEVELS, levelInfo, makeToken } from "@/lib/eco";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Earn eco-points for zero-waste meals, climb the hostel leaderboard and redeem mess rewards.",
+          "Earn eco-points for zero-waste meals, climb the leaderboard and redeem mess rewards.",
       },
     ],
   }),
@@ -39,6 +39,8 @@ const ACTIONS = [
     desc: "Tell mess if you'll eat tomorrow. Saves cooking.",
     cta: "Book Meal",
     points: 10,
+    meal_type: "lunch",
+    status: "pre_booked" as const,
     image: unsplash("photo-1567337710282-00832b415979"),
   },
   {
@@ -47,6 +49,8 @@ const ACTIONS = [
     desc: "Upload empty plate photo after lunch.",
     cta: "Upload Photo",
     points: 15,
+    meal_type: "lunch",
+    status: "zero_waste" as const,
     image: unsplash("photo-1512621776951-a57141f2eefd"),
   },
   {
@@ -55,18 +59,11 @@ const ACTIONS = [
     desc: "Donate extra meal to staff/NGO.",
     cta: "Donate Now",
     points: 25,
+    meal_type: "dinner",
+    status: "zero_waste" as const,
     image: unsplash("photo-1593113646773-028c64a8f1b8"),
   },
 ];
-
-const WEEK = [
-  { day: "Wed", v: 38 },
-  { day: "Thu", v: 74 },
-  { day: "Fri", v: 55 },
-  { day: "Sat", v: 68 },
-  { day: "Sun", v: 92 },
-];
-
 
 const REWARDS = [
   { id: "dessert", emoji: "🍦", name: "Free Dessert", cost: 100 },
@@ -74,7 +71,32 @@ const REWARDS = [
   { id: "free", emoji: "🎟️", name: "1 Day Mess Free", cost: 1000 },
 ];
 
-function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+type Profile = {
+  id: string;
+  full_name: string;
+  roll_no: string | null;
+  branch: string | null;
+  eco_points: number;
+  total_eaten: number;
+};
+
+type Redemption = {
+  id: string;
+  reward_name: string;
+  token: string;
+  cost: number;
+  created_at: string;
+};
+
+function Modal({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <AnimatePresence>
       {open && (
@@ -101,15 +123,31 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
   );
 }
 
+const dayLabel = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short" });
+const dayKey = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+
 function Index() {
-  const [points, setPoints] = useState(1250);
-  const [modal, setModal] = useState<null | "book" | "plate">(null);
+  const { session, loading } = useSession();
+  const navigate = useNavigate();
+  const userId = session?.user.id ?? null;
+  const isAuthed = !!userId;
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [logs, setLogs] = useState<{ created_at: string; points_earned: number }[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [rows, setRows] = useState<
+    { id: string; full_name: string; branch: string | null; eco_points: number }[]
+  >([]);
+
+  const [modal, setModal] = useState<null | "book" | "plate" | "level">(null);
+  const [congrats, setCongrats] = useState<null | { name: string; token: string; left: number }>(null);
   const [verified, setVerified] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showSync, setShowSync] = useState(false);
-  const { session, loading } = useSession();
-  const navigate = useNavigate();
-  const isAuthed = !!session;
+
+  const points = profile?.eco_points ?? 0;
+  const meals = profile?.total_eaten ?? 0;
+  const lvl = levelInfo(points);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -119,56 +157,147 @@ function Index() {
   }, []);
 
   useEffect(() => {
-    if (isAuthed && sessionStorage.getItem("ecomess_just_logged_in") === "1") {
-      sessionStorage.removeItem("ecomess_just_logged_in");
-      setShowSync(true);
+    if (isAuthed && userId) {
+      localStorage.setItem("currentUserId", userId);
+      if (sessionStorage.getItem("ecomess_just_logged_in") === "1") {
+        sessionStorage.removeItem("ecomess_just_logged_in");
+        setShowSync(true);
+        const t = setTimeout(() => setShowSync(false), 3000);
+        return () => clearTimeout(t);
+      }
+    } else if (!loading) {
+      localStorage.removeItem("currentUserId");
     }
-  }, [isAuthed]);
+  }, [isAuthed, userId, loading]);
 
-  const [rows, setRows] = useState<
-    { id: string; full_name: string; branch: string | null; eco_points: number }[]
-  >([]);
-
-  useEffect(() => {
-    if (!isAuthed) {
+  const refresh = useCallback(async () => {
+    if (!userId) {
+      setProfile(null);
+      setLogs([]);
+      setRedemptions([]);
       setRows([]);
       return;
     }
-    let active = true;
-    supabase
-      .rpc("get_leaderboard")
-      .then(({ data }) => {
-        if (active && data) setRows(data as typeof rows);
-      });
-    return () => {
-      active = false;
-    };
-  }, [isAuthed]);
+    const [p, l, r, lb] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase
+        .from("meal_logs")
+        .select("created_at, points_earned")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("redemptions")
+        .select("id, reward_name, token, cost, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_leaderboard"),
+    ]);
 
+    if (!p.data) {
+      const { data: created } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          full_name:
+            (session?.user.user_metadata?.["full_name"] as string) ||
+            session?.user.email?.split("@")[0] ||
+            "Student",
+          eco_points: 0,
+          total_eaten: 0,
+        })
+        .select("*")
+        .maybeSingle();
+      setProfile((created as Profile) ?? null);
+    } else {
+      setProfile(p.data as Profile);
+    }
+    setLogs(l.data ?? []);
+    setRedemptions((r.data as Redemption[]) ?? []);
+    setRows((lb.data as typeof rows) ?? []);
+  }, [userId, session]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const week = useMemo(() => {
+    const days: { day: string; key: string; pts: number }[] = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({ day: dayLabel(d), key: dayKey(d), pts: 0 });
+    }
+    for (const log of logs) {
+      const day = days.find((x) => x.key === dayKey(log.created_at));
+      if (day) day.pts += log.points_earned;
+    }
+    const max = Math.max(1, ...days.map((d) => d.pts));
+    return days.map((d) => ({ ...d, v: Math.round((d.pts / max) * 100) }));
+  }, [logs]);
 
   const notify = (msg: string) => toast(msg, { duration: 3000 });
 
-  const add = (n: number, msg: string) => {
-    setPoints((p) => p + n);
-    notify(msg);
+  const logMeal = async (action: (typeof ACTIONS)[number]) => {
+    if (!userId || !profile) {
+      navigate({ to: "/auth" });
+      return;
+    }
+    const nextPoints = points + action.points;
+    const { error } = await supabase.from("meal_logs").insert({
+      user_id: userId,
+      meal_type: action.meal_type,
+      status: action.status,
+      points_earned: action.points,
+    });
+    if (error) {
+      notify(error.message);
+      return;
+    }
+    await supabase
+      .from("profiles")
+      .update({ eco_points: nextPoints, total_eaten: meals + 1 })
+      .eq("id", userId);
+    notify(`+${action.points} pts • ${action.title}`);
+    await refresh();
   };
 
-  const redeem = (r: (typeof REWARDS)[number]) => {
-    if (points < r.cost) return;
-    setPoints((p) => p - r.cost);
-    notify(`Redeemed • ${r.name}`);
+  const redeem = async (r: (typeof REWARDS)[number]) => {
+    if (!userId || points < r.cost) return;
+    const token = makeToken(r.id);
+    const left = points - r.cost;
+    const { error } = await supabase.from("redemptions").insert({
+      user_id: userId,
+      reward_id: r.id,
+      reward_name: r.name,
+      cost: r.cost,
+      token,
+    });
+    if (error) {
+      notify(error.message);
+      return;
+    }
+    await supabase.from("profiles").update({ eco_points: left }).eq("id", userId);
+    await refresh();
+    setCongrats({ name: r.name, token, left });
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem("currentUserId");
     navigate({ to: "/auth", replace: true });
   };
 
-  const leaders = [
-    { name: "Yash Kadam", sub: "You • Hostel B", pts: points, you: true, medal: "🥇" },
-    { name: "Aarav Sharma", sub: "Hostel B", pts: 1180, you: false, medal: "🥈" },
-    { name: "Priya Mehta", sub: "Hostel B", pts: 1050, you: false, medal: "🥉" },
-  ];
+  const leaders = rows.map((r, i) => ({
+    id: r.id,
+    name: r.id === userId ? `${r.full_name || "You"}` : r.full_name || "Student",
+    sub: r.id === userId ? "You" : r.branch || "Student",
+    pts: r.eco_points,
+    you: r.id === userId,
+    medal: ["🥇", "🥈", "🥉"][i] ?? `#${i + 1}`,
+  }));
+
+  const displayName = profile?.full_name || session?.user.email || "Student";
 
   return (
     <div className="min-h-screen bg-background">
@@ -183,7 +312,7 @@ function Index() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-full bg-[#111111] text-[15px] font-semibold text-white">
-              Y
+              {displayName.charAt(0).toUpperCase()}
             </span>
             <div className="leading-tight">
               <h1 className="text-[15px] font-semibold tracking-tight">Eco-Mess</h1>
@@ -194,15 +323,14 @@ function Index() {
           <div className="flex items-center gap-2">
             {loading ? null : isAuthed ? (
               <>
-                <span className="hidden rounded-full border border-zinc-200 bg-white px-4 py-2 text-[13px] font-medium shadow-sm sm:inline">
-                  🔥 12 Day Streak
-                </span>
                 <span className="hidden text-right leading-tight sm:block">
                   <span className="block text-[13.5px] font-semibold tracking-tight">
-                    Yash Kadam • ECS 2nd Year
+                    {displayName}
+                    {profile?.branch ? ` • ${profile.branch}` : ""}
                   </span>
                   <span className="block text-[11.5px] text-muted-foreground">
-                    Day Scholar • Roll No. 33 • Veg
+                    {profile?.roll_no ? `Roll No. ${profile.roll_no} • ` : ""}
+                    {meals} meals logged
                   </span>
                 </span>
                 <motion.span
@@ -235,7 +363,19 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:py-10">
-
+        {!loading && !isAuthed && (
+          <div className="soft-card flex flex-wrap items-center justify-between gap-3 p-5">
+            <p className="text-[13.5px] text-muted-foreground">
+              Log in to start earning eco-points — every account starts at 0.
+            </p>
+            <Link
+              to="/auth"
+              className="rounded-full bg-[#111111] px-5 py-2.5 text-[13px] font-semibold text-white"
+            >
+              Login / Signup
+            </Link>
+          </div>
+        )}
 
         {/* HERO */}
         <section className="grid gap-4 lg:grid-cols-12">
@@ -252,22 +392,28 @@ function Index() {
               {points.toLocaleString()}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-full bg-[#D9F99D] px-3.5 py-1.5 text-[12px] font-semibold text-[#111111]">
-                Level 5 • Green Guardian
-              </span>
+              <button
+                type="button"
+                onClick={() => setModal("level")}
+                className="rounded-full bg-[#D9F99D] px-3.5 py-1.5 text-[12px] font-semibold text-[#111111] transition-opacity hover:opacity-90"
+              >
+                Level {lvl.level} • {lvl.name}
+              </button>
               <span className="rounded-full bg-white px-3.5 py-1.5 text-[12px] font-semibold text-[#111111]">
-                2x Bonus Today
+                {meals} meals logged
               </span>
             </div>
             <div className="mt-7">
               <div className="flex items-center justify-between text-[12px] text-white/60">
-                <span>Progress to Planet Hero</span>
-                <span>75%</span>
+                <span>
+                  {lvl.next ? `Progress to ${lvl.next.name}` : "Max level reached"}
+                </span>
+                <span>{Math.round(lvl.progress)}%</span>
               </div>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/12">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: "75%" }}
+                  animate={{ width: `${lvl.progress}%` }}
                   transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
                   className="h-full rounded-full bg-[#D9F99D]"
                 />
@@ -287,11 +433,15 @@ function Index() {
               </p>
               <div className="mt-4 flex flex-wrap gap-8">
                 <div>
-                  <p className="text-2xl font-bold tracking-tight">8.2kg</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    {(meals * 0.25).toFixed(1)}kg
+                  </p>
                   <p className="text-[12px] text-[#111111]/60">Food Saved</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold tracking-tight">12.5kg</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    {(meals * 0.38).toFixed(1)}kg
+                  </p>
                   <p className="text-[12px] text-[#111111]/60">CO₂ Avoided</p>
                 </div>
               </div>
@@ -307,17 +457,18 @@ function Index() {
                 Weekly Activity
               </p>
               <div className="mt-3 flex h-12 items-end justify-between gap-1.5">
-
-                {WEEK.map((d, i) => (
-                  <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
+                {week.map((d, i) => (
+                  <div key={d.key} className="flex flex-1 flex-col items-center gap-1.5">
                     <motion.div
+                      title={`${d.pts} pts`}
                       initial={{ height: 0 }}
-                      animate={{ height: `${d.v}%` }}
+                      animate={{ height: `${Math.max(d.v, 4)}%` }}
                       transition={{ duration: 0.6, delay: 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                      className={`w-full rounded-full ${i === WEEK.length - 1 ? "bg-[#111111]" : "bg-zinc-200"}`}
+                      className={`w-full rounded-full ${
+                        i === week.length - 1 ? "bg-[#111111]" : "bg-zinc-200"
+                      }`}
                     />
                     <span className="text-[9.5px] text-muted-foreground">{d.day}</span>
-
                   </div>
                 ))}
               </div>
@@ -354,11 +505,15 @@ function Index() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!isAuthed) {
+                        navigate({ to: "/auth" });
+                        return;
+                      }
                       if (a.id === "book") setModal("book");
                       else if (a.id === "plate") {
                         setVerified(false);
                         setModal("plate");
-                      } else add(25, "+25 pts • Meal Donated");
+                      } else void logMeal(a);
                     }}
                     className="mt-4 rounded-full bg-[#111111] px-4 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
                   >
@@ -375,36 +530,46 @@ function Index() {
           <div className="soft-card p-6 lg:col-span-3">
             <div className="flex items-center justify-between">
               <h2 className="text-[16px] font-semibold tracking-tight">Leaderboard 🏆</h2>
-              <span className="text-[12px] text-muted-foreground">This Week</span>
+              <span className="text-[12px] text-muted-foreground">All students</span>
             </div>
-            <ul className="mt-5 space-y-2.5">
-              {leaders.map((l) => (
-                <li
-                  key={l.name}
-                  className={`flex items-center gap-3 rounded-[20px] px-4 py-3 ${
-                    l.you ? "bg-[#111111] text-white" : "border border-zinc-200 bg-white"
-                  }`}
-                >
-                  <span className="text-[18px]">{l.medal}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
-                    <p className={`text-[11.5px] ${l.you ? "text-white/60" : "text-muted-foreground"}`}>
-                      {l.sub}
-                    </p>
-                  </div>
-                  <span className="text-[13.5px] font-semibold tabular-nums">
-                    {l.pts.toLocaleString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {leaders.length === 0 ? (
+              <p className="mt-5 text-[13px] text-muted-foreground">
+                {isAuthed ? "No students on the board yet." : "Log in to see the leaderboard."}
+              </p>
+            ) : (
+              <ul className="mt-5 space-y-2.5">
+                {leaders.map((l) => (
+                  <li
+                    key={l.id}
+                    className={`flex items-center gap-3 rounded-[20px] px-4 py-3 ${
+                      l.you ? "bg-[#111111] text-white" : "border border-zinc-200 bg-white"
+                    }`}
+                  >
+                    <span className="text-[18px]">{l.medal}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-semibold">{l.name}</p>
+                      <p
+                        className={`text-[11.5px] ${
+                          l.you ? "text-white/60" : "text-muted-foreground"
+                        }`}
+                      >
+                        {l.sub}
+                      </p>
+                    </div>
+                    <span className="text-[13.5px] font-semibold tabular-nums">
+                      {l.pts.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="soft-card p-6 lg:col-span-2">
             <h2 className="text-[16px] font-semibold tracking-tight">Rewards Store 🎁</h2>
             <ul className="mt-5 space-y-2.5">
               {REWARDS.map((r) => {
-                const ok = points >= r.cost;
+                const ok = isAuthed && points >= r.cost;
                 return (
                   <li
                     key={r.id}
@@ -418,7 +583,7 @@ function Index() {
                     <button
                       type="button"
                       disabled={!ok}
-                      onClick={() => redeem(r)}
+                      onClick={() => void redeem(r)}
                       className={`rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-opacity ${
                         ok
                           ? "bg-[#111111] text-white hover:opacity-90"
@@ -433,6 +598,37 @@ function Index() {
             </ul>
           </div>
         </section>
+
+        {/* MY REWARDS */}
+        {isAuthed && (
+          <section className="soft-card p-6">
+            <h2 className="text-[16px] font-semibold tracking-tight">My Rewards 🎫</h2>
+            {redemptions.length === 0 ? (
+              <p className="mt-4 text-[13px] text-muted-foreground">
+                No rewards claimed yet. Earn points and redeem your first one.
+              </p>
+            ) : (
+              <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
+                {redemptions.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-[20px] border border-zinc-200 p-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13.5px] font-semibold">{r.reward_name}</p>
+                      <p className="text-[11.5px] text-muted-foreground">
+                        {new Date(r.created_at).toLocaleDateString()} • {r.cost} pts
+                      </p>
+                    </div>
+                    <code className="rounded-full bg-[#F6F5F2] px-3 py-1.5 text-[11.5px] font-semibold">
+                      {r.token}
+                    </code>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </main>
 
       {/* Book modal */}
@@ -446,7 +642,7 @@ function Index() {
             type="button"
             onClick={() => {
               setModal(null);
-              add(10, "+10 pts • Lunch Booked");
+              void logMeal(ACTIONS[0]!);
             }}
             className="flex-1 rounded-full bg-[#111111] px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
           >
@@ -484,7 +680,7 @@ function Index() {
               type="button"
               onClick={() => {
                 setModal(null);
-                add(15, "+15 pts • Clean Plate");
+                void logMeal(ACTIONS[1]!);
               }}
               className="mt-4 w-full rounded-full bg-[#111111] px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
             >
@@ -494,10 +690,69 @@ function Index() {
         )}
       </Modal>
 
-      <ConnectSyncOverlay open={showSync} points={points} onClose={() => setShowSync(false)} />
+      {/* Level modal */}
+      <Modal open={modal === "level"} onClose={() => setModal(null)}>
+        <h3 className="text-lg font-semibold tracking-tight">Level system</h3>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          You are Level {lvl.level} • {lvl.name} with {points.toLocaleString()} points.
+          {lvl.next
+            ? ` ${lvl.pointsToNext} more points to reach ${lvl.next.name}.`
+            : " You've reached the top level."}
+        </p>
+        <ul className="mt-5 space-y-2">
+          {LEVELS.map((l) => (
+            <li
+              key={l.level}
+              className={`flex items-center justify-between rounded-[18px] px-4 py-2.5 text-[13px] ${
+                l.level === lvl.level
+                  ? "bg-[#111111] font-semibold text-white"
+                  : "border border-zinc-200"
+              }`}
+            >
+              <span>
+                Lvl {l.level} • {l.name}
+              </span>
+              <span className="tabular-nums">
+                {l.max === Infinity ? "1000+ pts" : `${l.min}–${l.max} pts`}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => setModal(null)}
+          className="mt-6 w-full rounded-full bg-[#111111] px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
+        >
+          Got it
+        </button>
+      </Modal>
+
+      {/* Congrats modal */}
+      <Modal open={!!congrats} onClose={() => setCongrats(null)}>
+        <p className="text-center text-4xl">🎉</p>
+        <h3 className="mt-3 text-center text-lg font-semibold tracking-tight">Congratulations!</h3>
+        <p className="mt-2 text-center text-[13px] text-muted-foreground">
+          You redeemed <span className="font-semibold text-[#111111]">{congrats?.name}</span>.
+          Show this code at the mess counter.
+        </p>
+        <p className="mt-5 rounded-[18px] bg-[#D9F99D] px-4 py-3 text-center text-[15px] font-bold tracking-wide text-[#111111]">
+          {congrats?.token}
+        </p>
+        <p className="mt-3 text-center text-[12.5px] text-muted-foreground">
+          Remaining balance: {congrats?.left.toLocaleString()} pts
+        </p>
+        <button
+          type="button"
+          onClick={() => setCongrats(null)}
+          className="mt-6 w-full rounded-full bg-[#111111] px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
+        >
+          Done
+        </button>
+      </Modal>
+
+      <FoodMatchLoader open={showSync} />
 
       <Toaster
-
         position="bottom-center"
         toastOptions={{
           className:
