@@ -49,6 +49,7 @@ export type Database = {
           full_name: string
           id: string
           roll_no: string | null
+          total_eaten: number
         }
         Insert: {
           branch?: string | null
@@ -57,6 +58,7 @@ export type Database = {
           full_name?: string
           id: string
           roll_no?: string | null
+          total_eaten?: number
         }
         Update: {
           branch?: string | null
@@ -65,6 +67,37 @@ export type Database = {
           full_name?: string
           id?: string
           roll_no?: string | null
+          total_eaten?: number
+        }
+        Relationships: []
+      }
+      redemptions: {
+        Row: {
+          cost: number
+          created_at: string
+          id: string
+          reward_id: string
+          reward_name: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          cost: number
+          created_at?: string
+          id?: string
+          reward_id: string
+          reward_name: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          id?: string
+          reward_id?: string
+          reward_name?: string
+          token?: string
+          user_id?: string
         }
         Relationships: []
       }
