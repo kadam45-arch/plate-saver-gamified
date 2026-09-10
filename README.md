@@ -14,13 +14,13 @@ Design Style:
 
 Sections to build from my existing code (keep same data and logic):
 
-1.  Top Header with Eco-Mess logo and user Yash Kadam CSE
+1.  Top Header with Eco-Mess logo and user Yash 
 
 2.  Hero Stats (3 cards): 
 
-    - Card 1: Total Eco-Points: 1250, streak 12 days. Make it white-ish premium card with glow.
+    - Card 1: Total Eco-Point(Green source): 10, streak 12 days. Make it white-ish premium card with glow.
 
-    - Card 2: Level 5 Green Guardian with XP bar 750/1000
+    - Card 2: Level 1 Seedling with XP bar 750/1000
 
     - Card 3: Impact: 8.2kg Food Saved, 12.5kg CO2 Avoided with bluish gradient.
 
