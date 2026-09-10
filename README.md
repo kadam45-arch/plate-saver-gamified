@@ -1,4 +1,4 @@
-# Eco-Mess Dashboard
+# Gamified Sustainability Dashboard
 
 Create a premium gamified dashboard called Eco-Mess for college mess food wastage.
 
