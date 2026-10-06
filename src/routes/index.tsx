@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import {
   Leaf, LayoutDashboard, Utensils, BarChart3, Trophy, Gift, Crown, Users, Settings,
   Upload, Recycle, Clock, Flame, CheckCircle2, Circle, Coffee, IceCream, Percent,
@@ -108,6 +109,7 @@ function EcoBite() {
 
   return (
     <div className="min-h-screen bg-eb-bg text-eb-text">
+      <Toaster position="bottom-center" theme="dark" />
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-eb-line bg-eb-bg lg:block">{Sidebar}</aside>
       {navOpen && (
         <div className="fixed inset-0 z-50 bg-eb-bg/70 backdrop-blur-sm lg:hidden" onClick={() => setNavOpen(false)}>
