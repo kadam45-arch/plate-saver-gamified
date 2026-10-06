@@ -264,7 +264,7 @@ function EcoBite() {
                   <div className="flex-1 text-sm">{r.n}<span className="block text-xs text-eb-dim">{r.c} points</span></div>
                   <button
                     onClick={() => {
-                      if (points < r.c) return toast.error("Not enough points");
+                      if (points < r.c) { toast.error("Not enough points"); return; }
                       setPoints((p) => p - r.c);
                       toast.success(`${r.n} redeemed`);
                     }}
