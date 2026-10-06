@@ -97,3 +97,32 @@
     box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.16);
   }
 }
+
+@theme inline {
+  --color-eb-bg: var(--eb-bg);
+  --color-eb-card: var(--eb-card);
+  --color-eb-raised: var(--eb-raised);
+  --color-eb-line: var(--eb-line);
+  --color-eb-text: var(--eb-text);
+  --color-eb-dim: var(--eb-dim);
+  --color-eb-green: var(--eb-green);
+  --color-eb-green-2: var(--eb-green-2);
+  --color-eb-green-3: var(--eb-green-3);
+  --color-eb-green-4: var(--eb-green-4);
+  --color-eb-cream: var(--eb-cream);
+  --color-eb-ink: var(--eb-ink);
+}
+:root {
+  --eb-bg: #0f0f0f;
+  --eb-card: #1e1e1e;
+  --eb-raised: #262626;
+  --eb-line: #2c2c2c;
+  --eb-text: #f5f5f4;
+  --eb-dim: #a1a1aa;
+  --eb-green: #22c55e;
+  --eb-green-2: #86efac;
+  --eb-green-3: #16a34a;
+  --eb-green-4: #bbf7d0;
+  --eb-cream: #faf6f0;
+  --eb-ink: #141414;
+}
