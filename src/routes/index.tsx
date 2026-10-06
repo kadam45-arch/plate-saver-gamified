@@ -64,6 +64,8 @@ function EcoBite() {
   const [booked, setBooked] = useState<Record<string, boolean>>({});
   const [recurring, setRecurring] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [plate, setPlate] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const [tasks, setTasks] = useState([
     { t: "Pre-book today's lunch", done: true, pts: 2 },
     { t: "Upload a clean plate", done: false, pts: 3 },
@@ -110,6 +112,19 @@ function EcoBite() {
   return (
     <div className="min-h-screen bg-eb-bg text-eb-text">
       <Toaster position="bottom-center" theme="dark" />
+      {plate && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-eb-bg/70 p-5 backdrop-blur-md" onClick={() => { URL.revokeObjectURL(plate); setPlate(null); }}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-xl border border-eb-line bg-eb-card p-5">
+            <p className="mb-3 font-semibold">Plate preview</p>
+            <img src={plate} alt="Uploaded plate" className="h-64 w-full rounded-lg object-cover" />
+            <p className="mt-3 text-sm text-eb-dim">{verifying ? "Checking your plate…" : "✅ Plate verified — looks clean!"}</p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { URL.revokeObjectURL(plate); setPlate(null); }} className="flex-1 rounded-lg border border-eb-line py-2 text-sm hover:bg-eb-raised">Cancel</button>
+              <button disabled={verifying} onClick={() => { setPoints((p) => p + 3); toast.success("Plate verified • +3 points"); URL.revokeObjectURL(plate); setPlate(null); }} className="flex-1 rounded-lg bg-eb-green py-2 text-sm font-medium text-eb-ink disabled:opacity-50">Collect +3 points</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-eb-line bg-eb-bg lg:block">{Sidebar}</aside>
       {navOpen && (
         <div className="fixed inset-0 z-50 bg-eb-bg/70 backdrop-blur-sm lg:hidden" onClick={() => setNavOpen(false)}>
@@ -146,9 +161,19 @@ function EcoBite() {
                   <p className="text-sm text-eb-dim">Plate Check</p>
                   <p className="mt-1 text-lg font-semibold">Snap your plate after eating</p>
                 </div>
-                <button onClick={() => { setPoints((p) => p + 3); toast.success("Plate verified • +3 points"); }} className="flex items-center gap-2 rounded-lg bg-eb-green px-4 py-2 text-sm font-medium text-eb-ink transition hover:brightness-110">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-eb-green px-4 py-2 text-sm font-medium text-eb-ink transition hover:brightness-110">
                   <Upload className="size-4" /> Upload plate
-                </button>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    if (!f.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+                    if (plate) URL.revokeObjectURL(plate);
+                    setPlate(URL.createObjectURL(f));
+                    setVerifying(true);
+                    setTimeout(() => setVerifying(false), 1500);
+                  }} />
+                </label>
               </div>
               <div className="mt-6 grid grid-cols-3 gap-3">
                 {[["Recyclable plate check", "94%"], ["Clean plates", "28"], ["Waste avoided", "6.4kg"]].map(([l, v]) => (
