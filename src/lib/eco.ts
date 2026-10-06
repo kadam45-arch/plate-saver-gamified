@@ -17,7 +17,7 @@ export function calculateLevel(points: number) {
 export function levelInfo(points: number) {
   const level = calculateLevel(points);
   const current = LEVELS[level - 1]!;
-  const next = LEVELS[level] ?? null;
+  const next = (LEVELS as readonly { level: number; name: string; min: number; max: number }[])[level] ?? null;
   const span = next ? next.min - current.min : 1;
   const progress = next
     ? Math.min(100, Math.max(0, ((points - current.min) / span) * 100))
