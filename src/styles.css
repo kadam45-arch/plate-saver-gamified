@@ -126,3 +126,26 @@
   --eb-cream: #faf6f0;
   --eb-ink: #141414;
 }
+
+.ecobite-theme {
+  --background: var(--eb-card);
+  --foreground: var(--eb-text);
+  --primary: var(--eb-green);
+  --primary-foreground: var(--eb-ink);
+  --secondary: var(--eb-raised);
+  --secondary-foreground: var(--eb-text);
+  --muted: var(--eb-raised);
+  --muted-foreground: var(--eb-dim);
+  --accent: var(--eb-raised);
+  --accent-foreground: var(--eb-text);
+  --popover: var(--eb-card);
+  --popover-foreground: var(--eb-text);
+  --border: var(--eb-line);
+  --input: var(--eb-line);
+  --ring: var(--eb-green);
+  --radius: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
